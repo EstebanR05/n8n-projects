@@ -8,19 +8,410 @@
         ],
         "additionalFields": {}
       },
+      "id": "09c3b24e-e8cb-4257-83da-ef19bc32ec17",
+      "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.2,
       "position": [
-        0,
-        0
+        -1080,
+        200
       ],
-      "id": "09c3b24e-e8cb-4257-83da-ef19bc32ec17",
-      "name": "Telegram Trigger",
       "webhookId": "c8a2d154-8f5e-416a-ab3d-36ee5dc30f64"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-photo",
+              "leftValue": "={{ Array.isArray($json.message?.photo) && $json.message.photo.length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e5a47f9d-6eb2-4346-8f28-1f4f3f0877f4",
+      "name": "Validador Foto",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -860,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.message.chat.id }}",
+        "text": "Envíame una foto de la factura para procesarla.",
+        "additionalFields": {}
+      },
+      "id": "4eb0fa09-f4e9-4e59-b706-198865fa3d8f",
+      "name": "Responder Error",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -620,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/getFile",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "file_id",
+              "value": "={{ $json.message.photo[$json.message.photo.length - 1].file_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6cf6e8b1-df20-47bc-9df2-1f1f1841a90f",
+      "name": "Obtener FilePath Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -620,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.telegram.org/file/bot{{$env.TELEGRAM_BOT_TOKEN}}/{{$json.result.file_path}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "invoiceImage"
+            }
+          }
+        }
+      },
+      "id": "2c31f94e-46a3-45a4-a2bf-8962609f8128",
+      "name": "Descargar Imagen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -380,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $binary.invoiceImage;\nif (!b?.data) throw new Error('No se encontró binary.invoiceImage.data');\n\nconst now = new Date();\nconst timestamp = now.toISOString().replace(/[.:]/g, '-');\n\nreturn [{\n  json: {\n    fileName: `factura-${timestamp}.${b.fileExtension || 'jpg'}`,\n    mimeType: b.mimeType || 'image/jpeg',\n    telegramFileId: $('Telegram Trigger').item.json.message.photo.slice(-1)[0].file_id,\n    chatId: $('Telegram Trigger').item.json.message.chat.id,\n    messageId: $('Telegram Trigger').item.json.message.message_id,\n    imageBase64: b.data\n  },\n  binary: {\n    invoiceImage: b\n  }\n}];"
+      },
+      "id": "3a71f12d-bec1-47f9-af65-9128f3d74eef",
+      "name": "Preparar Datos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "binaryData": true,
+        "binaryPropertyName": "invoiceImage",
+        "name": "={{ $json.fileName }}",
+        "parents": [],
+        "options": {}
+      },
+      "id": "389d1b19-9243-4226-a3fd-08f1d65cfa32",
+      "name": "Guardar en Google Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        80,
+        -20
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.GROQ_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  model: 'meta-llama/llama-4-scout-17b-16e-instruct',\n  temperature: 0.1,\n  response_format: {\n    type: 'json_object'\n  },\n  messages: [\n    {\n      role: 'system',\n      content: 'Eres un OCR modular para facturas. Extrae campos con alta precisión y devuelve SOLO JSON válido.'\n    },\n    {\n      role: 'user',\n      content: [\n        {\n          type: 'text',\n          text: 'Analiza esta factura y devuelve JSON con: proveedor, nif_proveedor, numero_factura, fecha_emision (YYYY-MM-DD), moneda, subtotal, impuestos, total, items[{descripcion,cantidad,precio_unitario,total}], metodo_pago, confianza_global (0-1), observaciones.'\n        },\n        {\n          type: 'image_url',\n          image_url: {\n            url: `data:${$json.mimeType};base64,${$json.imageBase64}`\n          }\n        }\n      ]\n    }\n  ]\n} }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "2b1ba1df-7235-4f7f-a017-6cc9f77ae056",
+      "name": "OCR Modular (Groq)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const responseText = $json.choices?.[0]?.message?.content || '{}';\nlet parsed;\ntry {\n  parsed = JSON.parse(responseText);\n} catch (e) {\n  throw new Error(`Groq no devolvió JSON parseable: ${responseText}`);\n}\n\nconst drive = $('Guardar en Google Drive').item.json;\n\nreturn [{\n  json: {\n    source: 'telegram',\n    processedAt: new Date().toISOString(),\n    chatId: $('Preparar Datos').item.json.chatId,\n    messageId: $('Preparar Datos').item.json.messageId,\n    telegramFileId: $('Preparar Datos').item.json.telegramFileId,\n    driveFileId: drive.id || null,\n    driveFileName: drive.name || $('Preparar Datos').item.json.fileName,\n    invoice: parsed\n  }\n}];"
+      },
+      "id": "6bc4676f-3f15-4e11-a554-bf99c7cf8397",
+      "name": "Normalizar Factura",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SHIFTS_WEBHOOK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SHIFTS_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "318600b8-960d-48d0-a637-234c1967cf95",
+      "name": "Subir a Shifts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        580,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://firestore.googleapis.com/v1/projects/{{$env.GCP_PROJECT_ID}}/databases/(default)/documents/postgres?documentId={{$json.invoice.numero_factura || $json.messageId}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.GCP_FIRESTORE_BEARER_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  fields: {\n    source: { stringValue: $json.source },\n    processedAt: { stringValue: $json.processedAt },\n    chatId: { stringValue: String($json.chatId) },\n    messageId: { stringValue: String($json.messageId) },\n    telegramFileId: { stringValue: String($json.telegramFileId) },\n    driveFileId: { stringValue: String($json.driveFileId || '') },\n    driveFileName: { stringValue: String($json.driveFileName || '') },\n    invoiceJson: { stringValue: JSON.stringify($json.invoice) }\n  }\n} }}",
+        "options": {}
+      },
+      "id": "8f159e95-f97c-45f4-81b2-9a7f2f0cc6a7",
+      "name": "Subir a Postgres (Firestore)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        580,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Preparar Datos').item.json.chatId }}",
+        "text": "Factura procesada correctamente. Datos enviados a Shifts y Firestore.",
+        "additionalFields": {}
+      },
+      "id": "f49641af-2870-40d3-8684-aee8eecfa1f1",
+      "name": "Confirmar en Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        840,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "0f4f6a45-aa8d-4f2e-b5cc-35b55b523ba4",
+      "name": "Esperar Ambos Envíos",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        760,
+        220
+      ]
     }
   ],
   "pinData": {},
-  "connections": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validador Foto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validador Foto": {
+      "main": [
+        [
+          {
+            "node": "Obtener FilePath Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener FilePath Telegram": {
+      "main": [
+        [
+          {
+            "node": "Descargar Imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar Imagen": {
+      "main": [
+        [
+          {
+            "node": "Preparar Datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Datos": {
+      "main": [
+        [
+          {
+            "node": "Guardar en Google Drive",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "OCR Modular (Groq)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OCR Modular (Groq)": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Factura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Factura": {
+      "main": [
+        [
+          {
+            "node": "Subir a Shifts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Subir a Postgres (Firestore)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subir a Shifts": {
+      "main": [
+        [
+          {
+            "node": "Esperar Ambos Envíos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subir a Postgres (Firestore)": {
+      "main": [
+        [
+          {
+            "node": "Esperar Ambos Envíos",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Esperar Ambos Envíos": {
+      "main": [
+        [
+          {
+            "node": "Confirmar en Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
   "active": false,
   "settings": {
     "executionOrder": "v1"
