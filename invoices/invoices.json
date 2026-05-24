@@ -1,0 +1,34 @@
+{
+  "name": "invoices",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "09c3b24e-e8cb-4257-83da-ef19bc32ec17",
+      "name": "Telegram Trigger",
+      "webhookId": "c8a2d154-8f5e-416a-ab3d-36ee5dc30f64"
+    }
+  ],
+  "pinData": {},
+  "connections": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "60961689-9099-4796-aa2b-6107ae05a4f7",
+  "meta": {
+    "instanceId": "2ca4446f94a30c6d7cea9e6b62625628731e1dd18b5b7e7968f7153ed571484e"
+  },
+  "id": "4HOwIFVopAj14bTn",
+  "tags": []
+}
