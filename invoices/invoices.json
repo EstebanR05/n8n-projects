@@ -191,30 +191,41 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ $env.SHIFTS_WEBHOOK_URL }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.SHIFTS_API_KEY}}"
-            }
-          ]
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GSHEETS_DOCUMENT_ID }}"
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json }}",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $env.GSHEETS_SHEET_NAME || \"Facturas\" }}"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "processedAt": "={{ $json.processedAt }}",
+            "proveedor": "={{ $json.invoice.proveedor || \"\" }}",
+            "numero_factura": "={{ $json.invoice.numero_factura || \"\" }}",
+            "fecha_emision": "={{ $json.invoice.fecha_emision || \"\" }}",
+            "moneda": "={{ $json.invoice.moneda || \"\" }}",
+            "subtotal": "={{ $json.invoice.subtotal || \"\" }}",
+            "impuestos": "={{ $json.invoice.impuestos || \"\" }}",
+            "total": "={{ $json.invoice.total || \"\" }}",
+            "metodo_pago": "={{ $json.invoice.metodo_pago || \"\" }}",
+            "confianza_global": "={{ $json.invoice.confianza_global || \"\" }}",
+            "driveFileId": "={{ $json.driveFileId || \"\" }}",
+            "driveFileName": "={{ $json.driveFileName || \"\" }}",
+            "invoice_json": "={{ JSON.stringify($json.invoice) }}"
+          }
+        },
         "options": {}
       },
       "id": "318600b8-960d-48d0-a637-234c1967cf95",
-      "name": "Subir a Shifts",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "name": "Subir a Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
       "position": [
         580,
         120
@@ -254,7 +265,7 @@
     {
       "parameters": {
         "chatId": "={{ $('Preparar Datos').item.json.chatId }}",
-        "text": "Factura procesada correctamente. Datos enviados a Shifts y Firestore.",
+        "text": "Factura procesada correctamente. Datos enviados a Google Sheets y Firestore.",
         "additionalFields": {}
       },
       "id": "f49641af-2870-40d3-8684-aee8eecfa1f1",
@@ -366,23 +377,12 @@
       "main": [
         [
           {
-            "node": "Subir a Shifts",
+            "node": "Subir a Google Sheets",
             "type": "main",
             "index": 0
           },
           {
             "node": "Subir a Postgres (Firestore)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Subir a Shifts": {
-      "main": [
-        [
-          {
-            "node": "Esperar Ambos Envíos",
             "type": "main",
             "index": 0
           }
@@ -405,6 +405,17 @@
         [
           {
             "node": "Confirmar en Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subir a Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Esperar Ambos Envíos",
             "type": "main",
             "index": 0
           }
