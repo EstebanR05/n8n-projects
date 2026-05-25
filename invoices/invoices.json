@@ -215,11 +215,34 @@
     },
     {
       "parameters": {
-        "operation": "create",
+        "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "https://docs.google.com/spreadsheets/d/1MDYegtp-KuQf9eYR5GQT-W_uAxEsuerLYZcBmAULd88/edit?usp=sharing",
-          "mode": "url"
+          "mode": "id",
+          "value": "={{ $env.GSHEETS_DOCUMENT_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $env.GSHEETS_SHEET_NAME || \"Facturas\" }}"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "processedAt": "={{ $json.processedAt }}",
+            "proveedor": "={{ $json.invoice.proveedor || \"\" }}",
+            "numero_factura": "={{ $json.invoice.numero_factura || \"\" }}",
+            "fecha_emision": "={{ $json.invoice.fecha_emision || \"\" }}",
+            "moneda": "={{ $json.invoice.moneda || \"\" }}",
+            "subtotal": "={{ $json.invoice.subtotal || \"\" }}",
+            "impuestos": "={{ $json.invoice.impuestos || \"\" }}",
+            "total": "={{ $json.invoice.total || \"\" }}",
+            "metodo_pago": "={{ $json.invoice.metodo_pago || \"\" }}",
+            "confianza_global": "={{ $json.invoice.confianza_global || \"\" }}",
+            "driveFileId": "={{ $json.driveFileId || \"\" }}",
+            "driveFileName": "={{ $json.driveFileName || \"\" }}",
+            "invoice_json": "={{ JSON.stringify($json.invoice) }}"
+          }
         },
         "options": {}
       },
