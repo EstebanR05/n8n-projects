@@ -81,7 +81,7 @@
     },
     {
       "parameters": {
-        "url": "=https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/getFile",
+        "url": "=https://api.telegram.org/bot{{$vars.TELEGRAM_BOT_TOKEN}}/getFile",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
@@ -104,7 +104,7 @@
     },
     {
       "parameters": {
-        "url": "=https://api.telegram.org/file/bot{{$env.TELEGRAM_BOT_TOKEN}}/{{$json.result.file_path}}",
+        "url": "=https://api.telegram.org/file/bot{{$vars.TELEGRAM_BOT_TOKEN}}/{{$json.result.file_path}}",
         "options": {
           "response": {
             "response": {
@@ -179,7 +179,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "=Bearer {{$env.GROQ_API_KEY}}"
+              "value": "=Bearer {{$vars.GROQ_API_KEY}}"
             },
             {
               "name": "Content-Type",
@@ -222,12 +222,12 @@
         "documentId": {
           "__rl": true,
           "mode": "id",
-          "value": "={{ $env.GSHEETS_DOCUMENT_ID }}"
+          "value": "1MDYegtp-KuQf9eYR5GQT-W_uAxEsuerLYZcBmAULd88"
         },
         "sheetName": {
           "__rl": true,
           "mode": "name",
-          "value": "={{ $env.GSHEETS_SHEET_NAME || \"Facturas\" }}"
+          "value": "Invoices_n8n"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -267,13 +267,13 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://firestore.googleapis.com/v1/projects/{{$env.GCP_PROJECT_ID}}/databases/(default)/documents/postgres?documentId={{$json.invoice.numero_factura || $json.messageId}}",
+        "url": "=https://firestore.googleapis.com/v1/projects/{{$vars.GCP_PROJECT_ID}}/databases/(default)/documents/postgres?documentId={{$json.invoice.numero_factura || $json.messageId}}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Authorization",
-              "value": "=Bearer {{$env.GCP_FIRESTORE_BEARER_TOKEN}}"
+              "value": "=Bearer {{$vars.GCP_FIRESTORE_BEARER_TOKEN}}"
             },
             {
               "name": "Content-Type",
