@@ -138,6 +138,9 @@
     },
     {
       "parameters": {
+        "operation": "upload",
+        "binaryData": true,
+        "binaryPropertyName": "invoiceImage",
         "name": "={{ $json.fileName }}",
         "driveId": {
           "__rl": true,
