@@ -8,15 +8,21 @@
         ],
         "additionalFields": {}
       },
-      "id": "09c3b24e-e8cb-4257-83da-ef19bc32ec17",
+      "id": "04d51692-fd40-41ac-9f19-2904f2433281",
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.2,
       "position": [
-        -1080,
-        200
+        -2320,
+        192
       ],
-      "webhookId": "c8a2d154-8f5e-416a-ab3d-36ee5dc30f64"
+      "webhookId": "c8a2d154-8f5e-416a-ab3d-36ee5dc30f64",
+      "credentials": {
+        "telegramApi": {
+          "id": "W6ng0IMChvUVvQ5X",
+          "name": "Telegram account"
+        }
+      }
     },
     {
       "parameters": {
@@ -42,13 +48,13 @@
         },
         "options": {}
       },
-      "id": "e5a47f9d-6eb2-4346-8f28-1f4f3f0877f4",
+      "id": "891e87fe-6e56-4625-ab13-d32abb9f9884",
       "name": "Validador Foto",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -860,
-        200
+        -2112,
+        192
       ]
     },
     {
@@ -57,18 +63,24 @@
         "text": "Envíame una foto de la factura para procesarla.",
         "additionalFields": {}
       },
-      "id": "4eb0fa09-f4e9-4e59-b706-198865fa3d8f",
+      "id": "31a2e3cf-49b1-4a0f-84c6-f6e0ee32e076",
       "name": "Responder Error",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        -620,
-        360
-      ]
+        -1872,
+        352
+      ],
+      "webhookId": "f42637b9-94b2-4baa-9c5a-a798549048a6",
+      "credentials": {
+        "telegramApi": {
+          "id": "W6ng0IMChvUVvQ5X",
+          "name": "Telegram account"
+        }
+      }
     },
     {
       "parameters": {
-        "method": "GET",
         "url": "=https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/getFile",
         "sendQuery": true,
         "queryParameters": {
@@ -81,18 +93,17 @@
         },
         "options": {}
       },
-      "id": "6cf6e8b1-df20-47bc-9df2-1f1f1841a90f",
+      "id": "39c3a4b6-04df-429b-b974-e660f40075f6",
       "name": "Obtener FilePath Telegram",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -620,
-        120
+        -1872,
+        112
       ]
     },
     {
       "parameters": {
-        "method": "GET",
         "url": "=https://api.telegram.org/file/bot{{$env.TELEGRAM_BOT_TOKEN}}/{{$json.result.file_path}}",
         "options": {
           "response": {
@@ -103,45 +114,58 @@
           }
         }
       },
-      "id": "2c31f94e-46a3-45a4-a2bf-8962609f8128",
+      "id": "918e96c4-e758-4e38-b645-04421c603a49",
       "name": "Descargar Imagen",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -380,
-        120
+        -1632,
+        112
       ]
     },
     {
       "parameters": {
         "jsCode": "const b = $binary.invoiceImage;\nif (!b?.data) throw new Error('No se encontró binary.invoiceImage.data');\n\nconst now = new Date();\nconst timestamp = now.toISOString().replace(/[.:]/g, '-');\n\nreturn [{\n  json: {\n    fileName: `factura-${timestamp}.${b.fileExtension || 'jpg'}`,\n    mimeType: b.mimeType || 'image/jpeg',\n    telegramFileId: $('Telegram Trigger').item.json.message.photo.slice(-1)[0].file_id,\n    chatId: $('Telegram Trigger').item.json.message.chat.id,\n    messageId: $('Telegram Trigger').item.json.message.message_id,\n    imageBase64: b.data\n  },\n  binary: {\n    invoiceImage: b\n  }\n}];"
       },
-      "id": "3a71f12d-bec1-47f9-af65-9128f3d74eef",
+      "id": "2fe27415-6a57-45b9-92a3-85788a1857ed",
       "name": "Preparar Datos",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -160,
-        120
+        -1408,
+        112
       ]
     },
     {
       "parameters": {
-        "operation": "upload",
-        "binaryData": true,
-        "binaryPropertyName": "invoiceImage",
         "name": "={{ $json.fileName }}",
-        "parents": [],
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
         "options": {}
       },
-      "id": "389d1b19-9243-4226-a3fd-08f1d65cfa32",
+      "id": "af568dc8-e6d5-499f-bab9-8ebc8c120078",
       "name": "Guardar en Google Drive",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        80,
-        -20
-      ]
+        -1168,
+        -48
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "Z0qnB67hRIOi0jSa",
+          "name": "Google Drive account"
+        }
+      }
     },
     {
       "parameters": {
@@ -167,69 +191,52 @@
           "timeout": 120000
         }
       },
-      "id": "2b1ba1df-7235-4f7f-a017-6cc9f77ae056",
+      "id": "2ecd0c0b-e691-49e9-9427-156e459536fa",
       "name": "OCR Modular (Groq)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        80,
-        220
+        -1168,
+        208
       ]
     },
     {
       "parameters": {
         "jsCode": "const responseText = $json.choices?.[0]?.message?.content || '{}';\nlet parsed;\ntry {\n  parsed = JSON.parse(responseText);\n} catch (e) {\n  throw new Error(`Groq no devolvió JSON parseable: ${responseText}`);\n}\n\nconst drive = $('Guardar en Google Drive').item.json;\n\nreturn [{\n  json: {\n    source: 'telegram',\n    processedAt: new Date().toISOString(),\n    chatId: $('Preparar Datos').item.json.chatId,\n    messageId: $('Preparar Datos').item.json.messageId,\n    telegramFileId: $('Preparar Datos').item.json.telegramFileId,\n    driveFileId: drive.id || null,\n    driveFileName: drive.name || $('Preparar Datos').item.json.fileName,\n    invoice: parsed\n  }\n}];"
       },
-      "id": "6bc4676f-3f15-4e11-a554-bf99c7cf8397",
+      "id": "a868ca52-5cfc-457a-90b1-b63885473a22",
       "name": "Normalizar Factura",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        320,
-        220
+        -928,
+        208
       ]
     },
     {
       "parameters": {
-        "operation": "append",
+        "operation": "create",
         "documentId": {
           "__rl": true,
-          "mode": "id",
-          "value": "={{ $env.GSHEETS_DOCUMENT_ID }}"
-        },
-        "sheetName": {
-          "__rl": true,
-          "mode": "name",
-          "value": "={{ $env.GSHEETS_SHEET_NAME || \"Facturas\" }}"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "processedAt": "={{ $json.processedAt }}",
-            "proveedor": "={{ $json.invoice.proveedor || \"\" }}",
-            "numero_factura": "={{ $json.invoice.numero_factura || \"\" }}",
-            "fecha_emision": "={{ $json.invoice.fecha_emision || \"\" }}",
-            "moneda": "={{ $json.invoice.moneda || \"\" }}",
-            "subtotal": "={{ $json.invoice.subtotal || \"\" }}",
-            "impuestos": "={{ $json.invoice.impuestos || \"\" }}",
-            "total": "={{ $json.invoice.total || \"\" }}",
-            "metodo_pago": "={{ $json.invoice.metodo_pago || \"\" }}",
-            "confianza_global": "={{ $json.invoice.confianza_global || \"\" }}",
-            "driveFileId": "={{ $json.driveFileId || \"\" }}",
-            "driveFileName": "={{ $json.driveFileName || \"\" }}",
-            "invoice_json": "={{ JSON.stringify($json.invoice) }}"
-          }
+          "value": "https://docs.google.com/spreadsheets/d/1MDYegtp-KuQf9eYR5GQT-W_uAxEsuerLYZcBmAULd88/edit?usp=sharing",
+          "mode": "url"
         },
         "options": {}
       },
-      "id": "318600b8-960d-48d0-a637-234c1967cf95",
+      "id": "ca0fddb6-a0b6-4dcb-8148-a3199521e41f",
       "name": "Subir a Google Sheets",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        580,
-        120
-      ]
+        -672,
+        112
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "D49knCy5WUppiTJl",
+          "name": "Google Sheets account"
+        }
+      }
     },
     {
       "parameters": {
@@ -253,13 +260,13 @@
         "jsonBody": "={{ {\n  fields: {\n    source: { stringValue: $json.source },\n    processedAt: { stringValue: $json.processedAt },\n    chatId: { stringValue: String($json.chatId) },\n    messageId: { stringValue: String($json.messageId) },\n    telegramFileId: { stringValue: String($json.telegramFileId) },\n    driveFileId: { stringValue: String($json.driveFileId || '') },\n    driveFileName: { stringValue: String($json.driveFileName || '') },\n    invoiceJson: { stringValue: JSON.stringify($json.invoice) }\n  }\n} }}",
         "options": {}
       },
-      "id": "8f159e95-f97c-45f4-81b2-9a7f2f0cc6a7",
+      "id": "c77e34ce-3328-479d-8420-781afdc71188",
       "name": "Subir a Postgres (Firestore)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        580,
-        320
+        -672,
+        304
       ]
     },
     {
@@ -268,14 +275,21 @@
         "text": "Factura procesada correctamente. Datos enviados a Google Sheets y Firestore.",
         "additionalFields": {}
       },
-      "id": "f49641af-2870-40d3-8684-aee8eecfa1f1",
+      "id": "e3f13608-5667-41dd-89d2-0078e547e9fd",
       "name": "Confirmar en Telegram",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        840,
-        220
-      ]
+        -272,
+        208
+      ],
+      "webhookId": "d8f7299d-c211-4649-b2cf-f276840c10a2",
+      "credentials": {
+        "telegramApi": {
+          "id": "W6ng0IMChvUVvQ5X",
+          "name": "Telegram account"
+        }
+      }
     },
     {
       "parameters": {
@@ -283,13 +297,13 @@
         "combineBy": "combineByPosition",
         "options": {}
       },
-      "id": "0f4f6a45-aa8d-4f2e-b5cc-35b55b523ba4",
+      "id": "a7434328-9585-4f35-bc00-d084e83d164d",
       "name": "Esperar Ambos Envíos",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.1,
       "position": [
-        760,
-        220
+        -480,
+        208
       ]
     }
   ],
@@ -427,8 +441,9 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "60961689-9099-4796-aa2b-6107ae05a4f7",
+  "versionId": "83e07695-080c-4d31-8d18-cbb0e7ff1805",
   "meta": {
+    "templateCredsSetupCompleted": true,
     "instanceId": "2ca4446f94a30c6d7cea9e6b62625628731e1dd18b5b7e7968f7153ed571484e"
   },
   "id": "4HOwIFVopAj14bTn",
