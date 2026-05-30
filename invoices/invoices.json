@@ -1,319 +1,65 @@
 {
-  "name": "invoices",
+  "name": "invoices_sheets",
   "nodes": [
     {
       "parameters": {
-        "updates": [
-          "message"
-        ],
-        "additionalFields": {}
-      },
-      "id": "04d51692-fd40-41ac-9f19-2904f2433281",
-      "name": "Telegram Trigger",
-      "type": "n8n-nodes-base.telegramTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        -2320,
-        192
-      ],
-      "webhookId": "c8a2d154-8f5e-416a-ab3d-36ee5dc30f64",
-      "credentials": {
-        "telegramApi": {
-          "id": "W6ng0IMChvUVvQ5X",
-          "name": "Telegram account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "has-photo",
-              "leftValue": "={{ Array.isArray($json.message?.photo) && $json.message.photo.length > 0 }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equal"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
+        "httpMethod": "POST",
+        "path": "invoices-upload",
+        "responseMode": "lastNode",
         "options": {}
       },
-      "id": "891e87fe-6e56-4625-ab13-d32abb9f9884",
-      "name": "Validador Foto",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
+      "id": "6b4c0527-b915-4dbb-aea8-a7da8e5469a2",
+      "name": "Webhook Upload",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
       "position": [
-        -2112,
-        192
-      ]
-    },
-    {
-      "parameters": {
-        "chatId": "={{ $json.message.chat.id }}",
-        "text": "Envíame una foto de la factura para procesarla.",
-        "additionalFields": {}
-      },
-      "id": "31a2e3cf-49b1-4a0f-84c6-f6e0ee32e076",
-      "name": "Responder Error",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [
-        -1872,
-        352
+        16880,
+        13024
       ],
-      "webhookId": "f42637b9-94b2-4baa-9c5a-a798549048a6",
-      "credentials": {
-        "telegramApi": {
-          "id": "W6ng0IMChvUVvQ5X",
-          "name": "Telegram account"
-        }
-      }
+      "webhookId": "invoices-upload-webhook"
     },
     {
       "parameters": {
-        "url": "=https://api.telegram.org/bot{{$vars.TELEGRAM_BOT_TOKEN}}/getFile",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "file_id",
-              "value": "={{ $json.message.photo[$json.message.photo.length - 1].file_id }}"
-            }
-          ]
-        },
-        "options": {}
+        "jsCode": "const item = $input.item;\nconst bin = item?.binary || $binary || {};\nconst keys = Object.keys(bin);\n\nif (!keys.length) {\n  const jsonKeys = Object.keys(item?.json || {});\n  throw new Error(`No se recibió archivo binario. Keys json recibidas: ${jsonKeys.join(', ') || '(ninguna)'}. Envía multipart/form-data con un archivo.`);\n}\n\nconst preferred = ['file', 'invoice', 'data'];\nconst fileKey = preferred.find((k) => keys.includes(k)) || keys[0];\nconst b = bin[fileKey];\nconst mimeType = String(b?.mimeType || '').toLowerCase();\n\nif (!mimeType.startsWith('image/')) {\n  throw new Error(`Archivo no válido (${mimeType || 'sin mimeType'}). Solo se permiten imágenes.`);\n}\n\nconst itemIndex = typeof $input.itemIndex === 'number' ? $input.itemIndex : 0;\nconst buffer = await this.helpers.getBinaryDataBuffer(itemIndex, fileKey);\nconst base64 = buffer.toString('base64');\n\nconst now = new Date();\nconst timestamp = now.toISOString().replace(/[.:]/g, '-');\n\nreturn [{\n  json: {\n    sourceBinaryKey: fileKey,\n    fileName: b.fileName || `factura-${timestamp}.${b.fileExtension || 'jpg'}`,\n    mimeType: mimeType || 'image/jpeg',\n    imageBase64: base64,\n    imageDataUrl: 'data:' + (mimeType || 'image/jpeg') + ';base64,' + base64\n  },\n  binary: {\n    invoiceImage: b,\n    data: b\n  }\n}];"
       },
-      "id": "39c3a4b6-04df-429b-b974-e660f40075f6",
-      "name": "Obtener FilePath Telegram",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        -1872,
-        112
-      ]
-    },
-    {
-      "parameters": {
-        "url": "=https://api.telegram.org/file/bot{{$vars.TELEGRAM_BOT_TOKEN}}/{{$json.result.file_path}}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file",
-              "outputPropertyName": "invoiceImage"
-            }
-          }
-        }
-      },
-      "id": "918e96c4-e758-4e38-b645-04421c603a49",
-      "name": "Descargar Imagen",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        -1632,
-        112
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const b = $binary.invoiceImage;\nif (!b?.data) throw new Error('No se encontró binary.invoiceImage.data');\n\nconst now = new Date();\nconst timestamp = now.toISOString().replace(/[.:]/g, '-');\n\nreturn [{\n  json: {\n    fileName: `factura-${timestamp}.${b.fileExtension || 'jpg'}`,\n    mimeType: b.mimeType || 'image/jpeg',\n    telegramFileId: $('Telegram Trigger').item.json.message.photo.slice(-1)[0].file_id,\n    chatId: $('Telegram Trigger').item.json.message.chat.id,\n    messageId: $('Telegram Trigger').item.json.message.message_id,\n    imageBase64: b.data\n  },\n  binary: {\n    invoiceImage: b\n  }\n}];"
-      },
-      "id": "2fe27415-6a57-45b9-92a3-85788a1857ed",
-      "name": "Preparar Datos",
+      "id": "fe60d199-5166-435a-860a-5f4f7259fe55",
+      "name": "Validar y Preparar Imagen",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1408,
-        112
+        17120,
+        13024
       ]
     },
     {
       "parameters": {
-        "operation": "upload",
-        "binaryData": true,
-        "binaryPropertyName": "invoiceImage",
         "name": "={{ $json.fileName }}",
         "driveId": {
           "__rl": true,
+          "value": "My Drive",
           "mode": "list",
-          "value": "My Drive"
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
         },
         "folderId": {
           "__rl": true,
-          "mode": "list",
-          "value": "root",
-          "cachedResultName": "/ (Root folder)"
+          "value": "={{ $env.GFOLTER_DRIVE_URL.split('folders/')[1].split('?')[0] }}",
+          "mode": "id"
         },
         "options": {}
       },
-      "id": "af568dc8-e6d5-499f-bab9-8ebc8c120078",
+      "id": "6c2ecfff-f089-4d11-8efc-c4297c75f4b0",
       "name": "Guardar en Google Drive",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        -1168,
-        -48
+        17504,
+        12896
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "Z0qnB67hRIOi0jSa",
+          "id": "34bDEmgvbs4yxgOM",
           "name": "Google Drive account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.groq.com/openai/v1/chat/completions",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$vars.GROQ_API_KEY}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ {\n  model: 'meta-llama/llama-4-scout-17b-16e-instruct',\n  temperature: 0.1,\n  response_format: {\n    type: 'json_object'\n  },\n  messages: [\n    {\n      role: 'system',\n      content: 'Eres un OCR modular para facturas. Extrae campos con alta precisión y devuelve SOLO JSON válido.'\n    },\n    {\n      role: 'user',\n      content: [\n        {\n          type: 'text',\n          text: 'Analiza esta factura y devuelve JSON con: proveedor, nif_proveedor, numero_factura, fecha_emision (YYYY-MM-DD), moneda, subtotal, impuestos, total, items[{descripcion,cantidad,precio_unitario,total}], metodo_pago, confianza_global (0-1), observaciones.'\n        },\n        {\n          type: 'image_url',\n          image_url: {\n            url: `data:${$json.mimeType};base64,${$json.imageBase64}`\n          }\n        }\n      ]\n    }\n  ]\n} }}",
-        "options": {
-          "timeout": 120000
-        }
-      },
-      "id": "2ecd0c0b-e691-49e9-9427-156e459536fa",
-      "name": "OCR Modular (Groq)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        -1168,
-        208
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const responseText = $json.choices?.[0]?.message?.content || '{}';\nlet parsed;\ntry {\n  parsed = JSON.parse(responseText);\n} catch (e) {\n  throw new Error(`Groq no devolvió JSON parseable: ${responseText}`);\n}\n\nconst drive = $('Guardar en Google Drive').item.json;\n\nreturn [{\n  json: {\n    source: 'telegram',\n    processedAt: new Date().toISOString(),\n    chatId: $('Preparar Datos').item.json.chatId,\n    messageId: $('Preparar Datos').item.json.messageId,\n    telegramFileId: $('Preparar Datos').item.json.telegramFileId,\n    driveFileId: drive.id || null,\n    driveFileName: drive.name || $('Preparar Datos').item.json.fileName,\n    invoice: parsed\n  }\n}];"
-      },
-      "id": "a868ca52-5cfc-457a-90b1-b63885473a22",
-      "name": "Normalizar Factura",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -928,
-        208
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "1MDYegtp-KuQf9eYR5GQT-W_uAxEsuerLYZcBmAULd88"
-        },
-        "sheetName": {
-          "__rl": true,
-          "mode": "name",
-          "value": "Invoices_n8n"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "processedAt": "={{ $json.processedAt }}",
-            "proveedor": "={{ $json.invoice.proveedor || \"\" }}",
-            "numero_factura": "={{ $json.invoice.numero_factura || \"\" }}",
-            "fecha_emision": "={{ $json.invoice.fecha_emision || \"\" }}",
-            "moneda": "={{ $json.invoice.moneda || \"\" }}",
-            "subtotal": "={{ $json.invoice.subtotal || \"\" }}",
-            "impuestos": "={{ $json.invoice.impuestos || \"\" }}",
-            "total": "={{ $json.invoice.total || \"\" }}",
-            "metodo_pago": "={{ $json.invoice.metodo_pago || \"\" }}",
-            "confianza_global": "={{ $json.invoice.confianza_global || \"\" }}",
-            "driveFileId": "={{ $json.driveFileId || \"\" }}",
-            "driveFileName": "={{ $json.driveFileName || \"\" }}",
-            "invoice_json": "={{ JSON.stringify($json.invoice) }}"
-          }
-        },
-        "options": {}
-      },
-      "id": "ca0fddb6-a0b6-4dcb-8148-a3199521e41f",
-      "name": "Subir a Google Sheets",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [
-        -672,
-        112
-      ],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "D49knCy5WUppiTJl",
-          "name": "Google Sheets account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "=https://firestore.googleapis.com/v1/projects/{{$vars.GCP_PROJECT_ID}}/databases/(default)/documents/postgres?documentId={{$json.invoice.numero_factura || $json.messageId}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$vars.GCP_FIRESTORE_BEARER_TOKEN}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ {\n  fields: {\n    source: { stringValue: $json.source },\n    processedAt: { stringValue: $json.processedAt },\n    chatId: { stringValue: String($json.chatId) },\n    messageId: { stringValue: String($json.messageId) },\n    telegramFileId: { stringValue: String($json.telegramFileId) },\n    driveFileId: { stringValue: String($json.driveFileId || '') },\n    driveFileName: { stringValue: String($json.driveFileName || '') },\n    invoiceJson: { stringValue: JSON.stringify($json.invoice) }\n  }\n} }}",
-        "options": {}
-      },
-      "id": "c77e34ce-3328-479d-8420-781afdc71188",
-      "name": "Subir a Postgres (Firestore)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        -672,
-        304
-      ]
-    },
-    {
-      "parameters": {
-        "chatId": "={{ $('Preparar Datos').item.json.chatId }}",
-        "text": "Factura procesada correctamente. Datos enviados a Google Sheets y Firestore.",
-        "additionalFields": {}
-      },
-      "id": "e3f13608-5667-41dd-89d2-0078e547e9fd",
-      "name": "Confirmar en Telegram",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [
-        -272,
-        208
-      ],
-      "webhookId": "d8f7299d-c211-4649-b2cf-f276840c10a2",
-      "credentials": {
-        "telegramApi": {
-          "id": "W6ng0IMChvUVvQ5X",
-          "name": "Telegram account"
         }
       }
     },
@@ -323,70 +69,140 @@
         "combineBy": "combineByPosition",
         "options": {}
       },
-      "id": "a7434328-9585-4f35-bc00-d084e83d164d",
-      "name": "Esperar Ambos Envíos",
+      "id": "54945680-bff4-4b8c-a680-eeb3cd7047e9",
+      "name": "Esperar Drive y OCR",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.1,
       "position": [
-        -480,
-        208
+        17840,
+        13008
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const mergedData = $('Esperar Drive y OCR').first().json;\n\nlet parsed = {};\n\nif (mergedData.candidates && mergedData.candidates.length > 0) {\n  let rawText = mergedData.candidates[0].content.parts[0].text || '{}';\n  if (typeof rawText === 'string') {\n    rawText = rawText.replace(/^\\s*```(json)?/im, '').replace(/\\s*```\\s*$/im, '').trim();\n  }\n  try {\n    parsed = JSON.parse(rawText || '{}');\n  } catch (e) {\n    throw new Error('El modelo no devolvió un JSON válido. Respuesta: ' + rawText);\n  }\n} else {\n  throw new Error('No se encontraron datos en la respuesta de la IA.');\n}\n\nconst rows = [];\n\n// Función para limpiar nulos\nconst safeStr = (v) => v !== undefined && v !== null ? String(v) : '';\n\n// 1. Procesar Encabezado Dinámico\nif (Array.isArray(parsed.encabezado)) {\n    for (let i = 0; i < parsed.encabezado.length; i += 2) {\n        const item1 = parsed.encabezado[i];\n        const item2 = i + 1 < parsed.encabezado.length ? parsed.encabezado[i + 1] : null;\n        \n        // Fila de Campos\n        rows.push({\n            \" \": item1.campo ? safeStr(item1.campo).toUpperCase() : \"\",\n            \"  \": \"\",\n            \"   \": item2 && item2.campo ? safeStr(item2.campo).toUpperCase() : \"\",\n            \"    \": \"\"\n        });\n        \n        // Fila de Valores\n        rows.push({\n            \" \": item1.valor ? safeStr(item1.valor) : \"\",\n            \"  \": \"\",\n            \"   \": item2 && item2.valor ? safeStr(item2.valor) : \"\",\n            \"    \": \"\"\n        });\n        \n        // Espaciador\n        rows.push({ \" \": \"\", \"  \": \"\", \"   \": \"\", \"    \": \"\" });\n    }\n} else {\n    // Fallback space\n    rows.push({ \" \": \"\", \"  \": \"\", \"   \": \"\", \"    \": \"\" });\n}\n\n// 2. Procesar Columnas Dinámicas de la Tabla\nif (Array.isArray(parsed.columnas_tabla)) {\n    const colA = safeStr(parsed.columnas_tabla[0]);\n    const colB = safeStr(parsed.columnas_tabla[1]);\n    const colC = safeStr(parsed.columnas_tabla[2]);\n    const colD = safeStr(parsed.columnas_tabla[3]);\n    \n    // Títulos de tabla\n    rows.push({ \" \": colA, \"  \": colB, \"   \": colC, \"    \": colD });\n    \n    // 3. Procesar Filas de la Tabla\n    if (Array.isArray(parsed.tabla_items)) {\n        parsed.tabla_items.forEach(itemArray => {\n            if (Array.isArray(itemArray)) {\n                rows.push({\n                    \" \": safeStr(itemArray[0]),\n                    \"  \": safeStr(itemArray[1]),\n                    \"   \": safeStr(itemArray[2]),\n                    \"    \": safeStr(itemArray[3])\n                });\n            }\n        });\n    }\n}\n\nrows.push({ \" \": \"\", \"  \": \"\", \"   \": \"\", \"    \": \"\" });\n\n// 4. Procesar Totales Dinámicos\nif (Array.isArray(parsed.totales)) {\n    parsed.totales.forEach(totalItem => {\n        rows.push({\n            \" \": \"\",\n            \"  \": \"\",\n            \"   \": safeStr(totalItem.campo).toUpperCase(),\n            \"    \": safeStr(totalItem.valor)\n        });\n    });\n}\n\nreturn rows.map(r => ({ json: r }));"
+      },
+      "id": "65937c4e-03f7-48d1-8fc5-3ee3fa83598f",
+      "name": "Normalizar Factura",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        18224,
+        13008
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GSHEETS_DOCUMENT_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Esperar Drive y OCR').first().json.name ? $('Esperar Drive y OCR').first().json.name.replace(/[^a-zA-Z0-9 _-]/g, '').substring(0, 50) : 'Factura-' + Date.now() }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            " ": "={{ $json[' '] || '' }}",
+            "  ": "={{ $json['  '] || '' }}",
+            "   ": "={{ $json['   '] || '' }}",
+            "    ": "={{ $json['    '] || '' }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "050714e7-33a0-4835-b73e-9c5dd4e41d85",
+      "name": "Subir a Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        18432,
+        13008
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CL0tSLHESUGrs5sx",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-goog-api-key",
+              "value": "={{$env.G_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { contents: [ { parts: [ { text: \"Analiza esta factura y extrae TODA su información de forma 100% dinámica, adaptándote a su formato exacto. Devuelve SOLO un objeto JSON válido con 4 claves: 1) 'encabezado': array de objetos con 'campo' y 'valor' para todos los datos generales que encuentres (Ej: Número de factura, Fecha, Emisor, Cliente, Direcciones completas, NIF, Vencimiento, Pedido, etc.). 2) 'columnas_tabla': array de strings con los títulos exactos de las columnas de los productos (máximo 4 columnas principales). 3) 'tabla_items': array de arrays de strings, donde cada sub-array representa una fila de la tabla siguiendo estrictamente el orden de 'columnas_tabla'. 4) 'totales': array de objetos con 'campo' y 'valor' correspondientes a la sección de pagos y totales (Subtotal, Descuentos, IVA, Total, Método de pago, etc). No uses Markdown ni bloques de código.\" }, { inline_data: { mime_type: $json.mimeType, data: $json.imageBase64 } } ] } ], generationConfig: { response_mime_type: 'application/json' } } }}",
+        "options": {}
+      },
+      "id": "8de26906-a22f-4033-aadb-ef96c3569f14",
+      "name": "Gemini API OCR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        17504,
+        13120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{$env.GSHEETS_DOCUMENT_ID}}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"requests\": [\n    {\n      \"addSheet\": {\n        \"properties\": {\n          \"title\": \"{{ $json.name ? $json.name.replace(/[^a-zA-Z0-9 _-]/g, '').substring(0, 50) : 'Factura-' + Date.now() }}\"\n        }\n      }\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "24527994-5fdb-4de0-935a-65492eebca31",
+      "name": "Crear Pestaña Sheets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        18048,
+        13008
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CL0tSLHESUGrs5sx",
+          "name": "Google Sheets account"
+        }
+      },
+      "continueOnFail": true
     }
   ],
   "pinData": {},
   "connections": {
-    "Telegram Trigger": {
+    "Webhook Upload": {
       "main": [
         [
           {
-            "node": "Validador Foto",
+            "node": "Validar y Preparar Imagen",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validador Foto": {
-      "main": [
-        [
-          {
-            "node": "Obtener FilePath Telegram",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Responder Error",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Obtener FilePath Telegram": {
-      "main": [
-        [
-          {
-            "node": "Descargar Imagen",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Descargar Imagen": {
-      "main": [
-        [
-          {
-            "node": "Preparar Datos",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Preparar Datos": {
+    "Validar y Preparar Imagen": {
       "main": [
         [
           {
@@ -395,18 +211,29 @@
             "index": 0
           },
           {
-            "node": "OCR Modular (Groq)",
+            "node": "Gemini API OCR",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "OCR Modular (Groq)": {
+    "Guardar en Google Drive": {
       "main": [
         [
           {
-            "node": "Normalizar Factura",
+            "node": "Esperar Drive y OCR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar Drive y OCR": {
+      "main": [
+        [
+          {
+            "node": "Crear Pestaña Sheets",
             "type": "main",
             "index": 0
           }
@@ -420,42 +247,26 @@
             "node": "Subir a Google Sheets",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Subir a Postgres (Firestore)",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
     },
-    "Subir a Postgres (Firestore)": {
+    "Gemini API OCR": {
       "main": [
         [
           {
-            "node": "Esperar Ambos Envíos",
+            "node": "Esperar Drive y OCR",
             "type": "main",
             "index": 1
           }
         ]
       ]
     },
-    "Esperar Ambos Envíos": {
+    "Crear Pestaña Sheets": {
       "main": [
         [
           {
-            "node": "Confirmar en Telegram",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Subir a Google Sheets": {
-      "main": [
-        [
-          {
-            "node": "Esperar Ambos Envíos",
+            "node": "Normalizar Factura",
             "type": "main",
             "index": 0
           }
@@ -463,15 +274,16 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "binaryMode": "separate"
   },
-  "versionId": "83e07695-080c-4d31-8d18-cbb0e7ff1805",
+  "versionId": "39b04ccd-8570-4773-84ee-8225b3893c05",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "2ca4446f94a30c6d7cea9e6b62625628731e1dd18b5b7e7968f7153ed571484e"
+    "instanceId": "033f7de2cc48bfbbcb5a787f9b1d48317dec27b65ef2ae078862dccfb5ce9ebc"
   },
-  "id": "4HOwIFVopAj14bTn",
+  "id": "6ff4JbhBIpjrchH6",
   "tags": []
 }
