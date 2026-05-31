@@ -1,5 +1,5 @@
 {
-  "name": "invoices_sheets",
+  "name": "auto_invoice",
   "nodes": [
     {
       "parameters": {
@@ -44,7 +44,9 @@
         "folderId": {
           "__rl": true,
           "value": "={{ $env.GFOLTER_DRIVE_URL.split('folders/')[1].split('?')[0] }}",
-          "mode": "id"
+          "mode": "list",
+          "cachedResultName": "invoices",
+          "cachedResultUrl": "={{ $env.GFOLTER_DRIVE_URL }}"
         },
         "options": {}
       },
@@ -97,7 +99,9 @@
         "documentId": {
           "__rl": true,
           "value": "={{ $env.GSHEETS_DOCUMENT_ID }}",
-          "mode": "id"
+          "mode": "list",
+          "cachedResultName": "={{ $env.GSHEETS_DOCUMENT_NAME }}",
+          "cachedResultUrl": "=https://docs.google.com/spreadsheets/d/{{ $env.GSHEETS_DOCUMENT_ID }}/edit?usp=drivesdk"
         },
         "sheetName": {
           "__rl": true,

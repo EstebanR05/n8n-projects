@@ -44,6 +44,7 @@ services:
       - G_API_KEY=${G_API_KEY}
       - GFOLTER_DRIVE_URL=${GFOLTER_DRIVE_URL}
       - GSHEETS_DOCUMENT_ID=${GSHEETS_DOCUMENT_ID}
+      - GSHEETS_DOCUMENT_NAME=${GSHEETS_DOCUMENT_NAME}
     volumes:
       - n8n_data:/home/node/.n8n
     depends_on:
